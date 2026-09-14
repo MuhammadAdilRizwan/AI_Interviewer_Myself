@@ -1,0 +1,21 @@
+MULTILINGUAL AI INTERVIEWER SAAS — DOCUMENT PACK
+Generated: 12 September 2026
+
+Files:
+1. Multilingual_AI_Interviewer_SaaS_SRS.docx
+   Software Requirements Specification (SRS)
+   Covers product scope, personas, functional/non-functional requirements,
+   multilingual requirements, security/privacy, APIs, data requirements,
+   acceptance criteria, future roadmap, and traceability.
+
+2. Multilingual_AI_Interviewer_SaaS_SDS.docx
+   Software Design Specification (SDS)
+   Covers architecture, frontend/backend structure, realtime voice design,
+   AI interview controller, prompts, database schema, REST APIs, event model,
+   background jobs, security, observability, deployment, testing, cost model,
+   failure recovery, retention, and implementation phases.
+
+Important:
+- Provider prices and model availability change. Revalidate them before production.
+- The design deliberately treats AI hiring recommendations as advisory and
+  keeps final hiring decisions with authorized humans.
