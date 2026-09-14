@@ -17,7 +17,7 @@ export default function Home() {
 
           <nav className="mt-10 space-y-1" aria-label="Main navigation">
             <NavItem label="Overview" active />
-            <NavItem label="Jobs" />
+            <NavItem label="Jobs" href="/jobs" />
             <NavItem label="Candidates" />
             <NavItem label="Reports" />
           </nav>
@@ -97,7 +97,7 @@ export default function Home() {
                     <h3 className="font-semibold text-slate-900">Active jobs</h3>
                     <p className="mt-1 text-xs text-slate-500">Track candidates across your open roles.</p>
                   </div>
-                  <button className="text-sm font-semibold text-[#1f6f68] hover:underline">View all</button>
+                  <Link href="/jobs" className="text-sm font-semibold text-[#1f6f68] hover:underline">View all</Link>
                 </div>
                 <div className="divide-y divide-slate-100">
                   <JobRow title="Senior Backend Engineer" candidates="32 candidates" progress="78%" tone="teal" />
@@ -131,9 +131,9 @@ export default function Home() {
                   Define a job rubric first, then let Screenwise handle the first round.
                 </p>
               </div>
-              <button className="mt-4 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#1f6f68] shadow-sm ring-1 ring-inset ring-[#cde4df] hover:bg-[#f9fffd] sm:mt-0">
+              <Link href="/jobs/new" className="mt-4 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#1f6f68] shadow-sm ring-1 ring-inset ring-[#cde4df] hover:bg-[#f9fffd] sm:mt-0">
                 Start with a job
-              </button>
+              </Link>
             </section>
           </div>
         </main>
@@ -142,9 +142,10 @@ export default function Home() {
   );
 }
 
-function NavItem({ label, active = false }: { label: string; active?: boolean }) {
+function NavItem({ label, href = "#", active = false }: { label: string; href?: string; active?: boolean }) {
   return (
-    <button
+    <Link
+      href={href}
       className={`flex w-full items-center rounded-lg px-3 py-2.5 text-left text-sm font-medium transition ${
         active
           ? "bg-[#eef7f5] text-[#1f6f68]"
@@ -153,7 +154,7 @@ function NavItem({ label, active = false }: { label: string; active?: boolean })
     >
       <span className={`mr-3 h-1.5 w-1.5 rounded-full ${active ? "bg-[#1f6f68]" : "bg-slate-300"}`} />
       {label}
-    </button>
+    </Link>
   );
 }
 
