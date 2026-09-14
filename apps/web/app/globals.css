@@ -21,3 +21,26 @@ body {
 * {
   border-color: #e2e8f0;
 }
+
+@layer components {
+  .input {
+    width: 100%;
+    border-radius: 0.625rem;
+    border: 1px solid #dbe3ec;
+    background: #ffffff;
+    padding: 0.7rem 0.8rem;
+    font-size: 0.875rem;
+    color: #142033;
+    outline: none;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+
+  .input::placeholder {
+    color: #94a3b8;
+  }
+
+  .input:focus {
+    border-color: #1f6f68;
+    box-shadow: 0 0 0 3px rgba(31, 111, 104, 0.12);
+  }
+}

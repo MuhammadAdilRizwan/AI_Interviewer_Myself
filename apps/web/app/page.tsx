@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-[#f6f8fb]">
@@ -73,9 +75,12 @@ export default function Home() {
                   Review interview progress and discover your strongest candidates.
                 </p>
               </div>
-              <button className="rounded-lg bg-[#1f6f68] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#185b55]">
+              <Link
+                href="/jobs/new"
+                className="rounded-lg bg-[#1f6f68] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#185b55]"
+              >
                 Create a job
-              </button>
+              </Link>
             </section>
 
             <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Workspace metrics">
