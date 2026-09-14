@@ -18,6 +18,21 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## API configuration
+
+The candidate interview flow uses a local `sessionStorage` adapter by default. To connect it to the FastAPI service, copy `.env.example` to `.env.local` and set:
+
+```text
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+```
+
+The frontend then calls the interview endpoints defined in the project specification:
+
+- `POST /api/v1/interviews/{token}/consent`
+- `POST /api/v1/interviews/{token}/start`
+- `POST /api/v1/interviews/{session_id}/events`
+- `POST /api/v1/interviews/{session_id}/complete`
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More
