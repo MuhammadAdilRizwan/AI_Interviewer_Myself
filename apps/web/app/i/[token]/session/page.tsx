@@ -2,6 +2,12 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import {
+  completeInterview,
+  recordInterviewEvent,
+  startInterview,
+} from "@/lib/api/interviews";
+import type { InterviewSession } from "@/lib/types";
 
 type InterviewerState = "speaking" | "listening" | "processing";
 
@@ -13,6 +19,7 @@ const questions = [
 
 export default function InterviewSessionPage() {
   const params = useParams<{ token: string }>();
+  const token = params.token;
   const router = useRouter();
   const [interviewerState, setInterviewerState] = useState<InterviewerState>("speaking");
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -20,6 +27,9 @@ export default function InterviewSessionPage() {
   const [answer, setAnswer] = useState("");
   const [submittedAnswers, setSubmittedAnswers] = useState<string[]>([]);
   const [microphoneStatus, setMicrophoneStatus] = useState("Connecting microphone...");
+  const [session, setSession] = useState<InterviewSession | null>(null);
+  const [eventSequence, setEventSequence] = useState(2);
+  const [apiError, setApiError] = useState("");
   const [showEndDialog, setShowEndDialog] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -47,27 +57,58 @@ export default function InterviewSessionPage() {
     }
 
     void connectMicrophone();
+    void startInterview(token, "english")
+      .then((createdSession) => {
+        if (mounted) setSession(createdSession);
+      })
+      .catch(() => {
+        if (mounted) setApiError("We could not start this interview. Please refresh and try again.");
+      });
     return () => {
       mounted = false;
       if (timer) window.clearInterval(timer);
       streamRef.current?.getTracks().forEach((track) => track.stop());
     };
-  }, []);
+  }, [token]);
 
-  function submitAnswer() {
-    if (!answer.trim() || interviewerState !== "listening") return;
+  async function submitAnswer() {
+    if (!answer.trim() || interviewerState !== "listening" || !session) return;
+    const submittedAnswer = answer.trim();
     setSubmittedAnswers((current) => [...current, answer.trim()]);
     setAnswer("");
     setInterviewerState("processing");
+    setApiError("");
 
-    window.setTimeout(() => {
-      setQuestionIndex((current) => Math.min(current + 1, questions.length - 1));
+    try {
+      await recordInterviewEvent(session, "candidate_turn_completed", eventSequence, {
+        questionNumber: questionIndex + 1,
+        transcriptLength: submittedAnswer.length,
+      });
+      setEventSequence((sequence) => sequence + 1);
+      if (isLastQuestion) {
+        await completeInterview(session, eventSequence + 1);
+        setSession((current) => (current ? { ...current, status: "completed" } : current));
+        window.setTimeout(() => router.push(`/i/${params.token}/complete`), 600);
+        return;
+      }
+      setQuestionIndex((current) => current + 1);
       setInterviewerState("speaking");
-    }, 900);
+    } catch {
+      setApiError("Your answer could not be saved. Please try submitting it again.");
+      setInterviewerState("listening");
+    }
   }
 
-  function finishInterview() {
+  async function finishInterview() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
+    if (session) {
+      try {
+        await completeInterview(session, eventSequence);
+      } catch {
+        setApiError("We could not record the completion event. Please try again.");
+        return;
+      }
+    }
     router.push(`/i/${params.token}/complete`);
   }
 
@@ -101,6 +142,7 @@ export default function InterviewSessionPage() {
             {interviewerState === "listening" && "Listening to your answer"}
             {interviewerState === "processing" && "Processing your response"}
           </p>
+          {apiError && <p role="alert" className="mx-auto mt-4 max-w-xl rounded-lg bg-red-50 px-4 py-3 text-left text-sm text-red-700">{apiError}</p>}
           <h1 className="mx-auto mt-3 max-w-xl text-2xl font-semibold tracking-tight text-slate-900">
             {question}
           </h1>
