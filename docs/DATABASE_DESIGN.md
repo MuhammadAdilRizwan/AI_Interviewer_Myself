@@ -134,6 +134,16 @@ organization_id UUID NOT NULL REFERENCES organizations(id)
 All repository queries must scope tenant-owned records by
 `organization_id`.
 
+Keep `organization_id` on tenant-owned child tables even when it can be
+derived through another foreign key. This improves authorization checks,
+row-level security, and dashboard indexes. Global tables such as `plans` do
+not require it. User-scoped authentication tables may omit it when the
+user-to-organization relationship is enforced separately.
+
+Foreign keys must also prevent cross-tenant relationships. Use composite
+foreign keys containing `organization_id` for sensitive relationships, or
+validate both tenant IDs in the same transaction.
+
 ### Sensitive files
 
 Audio, resumes, reports, and logos should be stored in private,
@@ -166,7 +176,6 @@ storage assets.
 | `name` | VARCHAR(160) | Display name |
 | `slug` | VARCHAR(100) | Unique URL-safe identifier |
 | `status` | ENUM/VARCHAR | `active`, `suspended`, `deleted` |
-| `plan_id` | UUID nullable | Default plan |
 | `default_language` | VARCHAR(20) | Organization default |
 | `timezone` | VARCHAR(64) | Dates and notifications |
 | `logo_storage_key` | TEXT nullable | Private logo object |
@@ -178,7 +187,10 @@ storage assets.
 
 - Unique `slug`
 - Index `status`
-- Foreign key to `plans` when plans are enabled
+- Billing plan is resolved from the organization's active subscription.
+- If a manual fallback is required later, add an explicitly named
+  `default_plan_id` or `billing_plan_override_id`; do not add an ambiguous
+  `plan_id`.
 
 ### 4.2 `users`
 
@@ -298,7 +310,8 @@ with password-reset semantics.
 | `plan_id` | UUID | Selected plan |
 | `provider_customer_id` | VARCHAR | Stripe customer |
 | `provider_subscription_id` | VARCHAR nullable | Stripe subscription |
-| `status` | ENUM/VARCHAR | Trialing, active, past due, canceled |
+| `status` | ENUM/VARCHAR | `trialing`, `active`, `past_due`, `unpaid`, `paused`, `canceled`, `incomplete`, `incomplete_expired` |
+| `provider_status` | VARCHAR(50) nullable | Raw provider status, if different |
 | `current_period_start` | TIMESTAMPTZ | Billing period |
 | `current_period_end` | TIMESTAMPTZ | Billing period |
 | `cancel_at_period_end` | BOOLEAN | Cancellation state |
@@ -306,7 +319,10 @@ with password-reset semantics.
 | `created_at` | TIMESTAMPTZ | Creation time |
 | `updated_at` | TIMESTAMPTZ | Last update |
 
-**Constraints:** Unique provider customer and subscription IDs where present.
+**Constraints:**
+
+- Unique provider customer and subscription IDs where present.
+- `CHECK (current_period_end > current_period_start)`.
 
 ---
 
@@ -340,6 +356,20 @@ with password-reset semantics.
 | `updated_at` | TIMESTAMPTZ | Last update |
 | `archived_at` | TIMESTAMPTZ nullable | Archive time |
 
+**Validation constraints:**
+
+- `length(trim(title)) > 0`
+- `duration_seconds > 0`
+- `max_questions > 0`
+- `min_questions >= 0 AND min_questions <= max_questions`
+- `max_follow_ups >= 0`
+- A published job must have `published_at` and at least one competency.
+- Published competency weights must total exactly `1.0000`; enforce this in the
+  publish transaction or with a deferred constraint trigger.
+
+**Indexes:** `(organization_id, status, updated_at DESC)` and
+`(organization_id, created_at DESC)`.
+
 ### 6.2 `job_competencies`
 
 **Purpose:** Weighted evaluation rubric for each job.
@@ -360,9 +390,14 @@ with password-reset semantics.
 
 **Rules:**
 
-- Unique competency name per job.
-- Weight must be non-negative.
-- Published job weights must total exactly `1.0000`.
+- `CHECK (weight >= 0 AND weight <= 1)`.
+- `CHECK (length(trim(name)) > 0)`.
+- `UNIQUE (job_id, name)`; use `lower(trim(name))` if competency names
+  should be case-insensitive.
+- `CHECK (display_order >= 0)` when using zero-based ordering.
+- Published job weights must total exactly `1.0000`; enforce this at publish
+  time in a transaction or with a deferred constraint trigger.
+- `UNIQUE (job_id, display_order)` when ordering must be unique.
 
 ### 6.3 `candidates`
 
@@ -411,6 +446,14 @@ different organizations.
 - Use cryptographically random opaque tokens.
 - Unique `token_hash`.
 - Reject expired, revoked, and exhausted links.
+- `CHECK (max_attempts > 0)`.
+- `CHECK (attempt_count >= 0 AND attempt_count <= max_attempts)`.
+- `CHECK (expires_at > created_at)`.
+- Attempt consumption must be an atomic conditional update so concurrent
+  requests cannot exceed `max_attempts`.
+
+**Indexes:** `(organization_id, status, expires_at)`,
+`(job_id, status)`, and `(candidate_id, created_at DESC)`.
 
 ---
 
@@ -427,7 +470,7 @@ different organizations.
 | `job_id` | UUID | Job |
 | `candidate_id` | UUID | Candidate |
 | `interview_link_id` | UUID | Invitation used |
-| `status` | ENUM/VARCHAR | Created, active, completed, failed |
+| `status` | ENUM/VARCHAR | Created, consented, connecting, active, reconnecting, completing, completed, abandoned, timed_out, failed |
 | `language` | VARCHAR(20) | Selected language |
 | `started_at` | TIMESTAMPTZ nullable | Start time |
 | `completed_at` | TIMESTAMPTZ nullable | Completion time |
@@ -437,12 +480,23 @@ different organizations.
 | `candidate_context_snapshot_json` | JSONB nullable | Resume/context snapshot |
 | `provider_name` | VARCHAR(80) nullable | Realtime provider |
 | `provider_session_id` | VARCHAR nullable | External session |
+| `failure_code` | VARCHAR(80) nullable | Machine-readable failure category |
+| `failure_reason` | TEXT nullable | Safe human-readable failure detail |
+| `failed_at` | TIMESTAMPTZ nullable | Failure time |
 | `created_at` | TIMESTAMPTZ | Creation time |
 | `updated_at` | TIMESTAMPTZ | Last update |
 
 **Critical rule:** Copy the job configuration and rubric into immutable
 snapshots when the interview starts. Later job edits must not change the
 historical interview.
+
+Keep report lifecycle in `evaluations.status`, not in `interviews.status`.
+The interview status describes the interview attempt; evaluation status
+describes report generation.
+
+**Indexes:** `(organization_id, status, created_at DESC)`,
+`(job_id, created_at DESC)`, `(candidate_id, created_at DESC)`, and
+`(organization_id, completed_at DESC)`.
 
 ### 7.2 `interview_consents`
 
@@ -460,6 +514,9 @@ historical interview.
 | `ip_address` | INET nullable | Compliance/security |
 | `user_agent` | TEXT nullable | Browser |
 | `consented_at` | TIMESTAMPTZ | Consent time |
+
+**Constraints:** `UNIQUE (interview_id, consent_type)`. Consent changes should
+be audited, and recording consent must be present before audio recording.
 
 ### 7.3 `interview_events`
 
@@ -499,6 +556,7 @@ historical interview.
 | `normalized_text` | TEXT nullable | Evaluation-normalized text |
 | `language` | VARCHAR(20) nullable | Detected language |
 | `is_final` | BOOLEAN | Final vs partial transcript |
+| `turn_type` | ENUM/VARCHAR | Question, answer, follow-up, clarification, system, or transition |
 | `section_name` | VARCHAR(120) nullable | Interview section |
 | `competency_id` | UUID nullable | Related competency |
 | `question_number` | INTEGER nullable | Question number |
@@ -614,7 +672,7 @@ instructions by the AI prompt system.
 | `id` | UUID | Primary key |
 | `organization_id` | UUID | Tenant |
 | `evaluation_id` | UUID | Evaluation |
-| `competency_id` | UUID nullable | Original competency |
+| `competency_id` | UUID | Original competency |
 | `competency_name_snapshot` | VARCHAR(120) | Historical name |
 | `score` | NUMERIC(5,2) | Usually 0–10 |
 | `normalized_score` | NUMERIC(6,2) | 0–100 equivalent |
@@ -622,6 +680,12 @@ instructions by the AI prompt system.
 | `strengths_json` | JSONB | Strength list |
 | `gaps_json` | JSONB | Gap list |
 | `created_at` | TIMESTAMPTZ | Creation time |
+
+**Constraints:**
+
+- `UNIQUE (evaluation_id, competency_id)`.
+- `CHECK (score >= 0 AND score <= 10)`.
+- `CHECK (normalized_score >= 0 AND normalized_score <= 100)`.
 
 ### 9.3 `evaluation_evidence`
 
@@ -632,18 +696,22 @@ instructions by the AI prompt system.
 | `id` | UUID | Primary key |
 | `organization_id` | UUID | Tenant |
 | `evaluation_id` | UUID | Evaluation |
+| `interview_id` | UUID | Denormalized interview identity for integrity checks |
 | `evaluation_competency_id` | UUID nullable | Related competency |
 | `turn_id` | UUID | Evidence transcript turn |
 | `evidence_type` | VARCHAR(40) | Supporting evidence or gap |
 | `explanation` | TEXT nullable | Evidence explanation |
 | `created_at` | TIMESTAMPTZ | Creation time |
 
-The backend must verify that the referenced turn belongs to the same
-interview as the evaluation.
+The referenced turn must belong to the same interview as the evaluation.
+Prefer composite foreign keys such as `(evaluation_id, interview_id)` and
+`(turn_id, interview_id)` so the database enforces this relationship. If the
+backend uses service-layer validation instead, perform it transactionally and
+test cross-interview evidence rejection.
 
 ### 9.4 `recruiter_decisions`
 
-**Purpose:** Human review and recommendation overrides.
+**Purpose:** Human review decisions, including confirmations and overrides.
 
 | Column | Type | Reason |
 |---|---|---|
@@ -653,13 +721,28 @@ interview as the evaluation.
 | `evaluation_id` | UUID | Evaluation reviewed |
 | `reviewer_user_id` | UUID | Authorized reviewer |
 | `decision` | VARCHAR(40) | Human decision |
-| `reason` | TEXT | Required override reason |
+| `decision_type` | VARCHAR(30) | `confirm`, `override`, `reject`, `request_review` |
+| `ai_recommendation_snapshot` | VARCHAR(40) | AI result reviewed |
+| `ai_score_snapshot` | NUMERIC(6,2) nullable | AI score reviewed |
+| `is_override` | BOOLEAN | Whether human decision differs |
+| `reason` | TEXT | Required explanation |
 | `notes` | TEXT nullable | Internal notes |
+| `superseded_at` | TIMESTAMPTZ nullable | Historical decision supersession |
 | `created_at` | TIMESTAMPTZ | Decision time |
-| `updated_at` | TIMESTAMPTZ | Last update |
 
 Never overwrite the AI recommendation. Display AI and human decisions
-separately.
+separately. Decisions are append-only: create a new row when a recruiter
+changes a decision and supersede the previous row. Enforce at most one
+current decision per evaluation with a partial unique index on
+`evaluation_id` where `superseded_at IS NULL`. Every creation and
+supersession should be written to `audit_logs`.
+
+**`is_override` definition:** `TRUE` exactly when the final human `decision`
+differs from `ai_recommendation_snapshot`; otherwise it is `FALSE`. The
+backend must generate and validate this value, not accept it from the
+frontend. Both fields must use the same canonical recommendation values.
+`request_review` is a non-final review action and should be tracked separately
+or excluded from final recruiter decisions.
 
 ---
 
@@ -706,11 +789,21 @@ Usage records should be append-only.
 | `payload_json` | JSONB | Safe template data |
 | `provider_message_id` | VARCHAR nullable | Email provider ID |
 | `failure_reason` | TEXT nullable | Delivery failure |
+| `attempt_count` | INTEGER | Delivery attempts |
+| `max_attempts` | INTEGER | Retry limit |
+| `next_attempt_at` | TIMESTAMPTZ nullable | Retry scheduling |
+| `last_attempt_at` | TIMESTAMPTZ nullable | Last delivery attempt |
+| `last_error` | TEXT nullable | Latest safe error |
 | `sent_at` | TIMESTAMPTZ nullable | Delivery time |
 | `created_at` | TIMESTAMPTZ | Creation time |
 
 Do not put raw transcript, resume contents, secrets, or signed URLs in
 notification payloads.
+
+**Constraints/indexes:** `attempt_count >= 0`,
+`max_attempts > 0`, `attempt_count <= max_attempts`, and
+`(status, next_attempt_at)` for retry workers. The retry worker must stop
+after the final attempt and set the notification to `failed` or `canceled`.
 
 ### 10.3 `audit_logs`
 
@@ -748,11 +841,13 @@ recommendation overrides, deletion, and billing webhook processing.
 | `report_retention_days` | INTEGER nullable | Report policy |
 | `audit_retention_days` | INTEGER nullable | Audit policy |
 | `delete_candidate_after_days` | INTEGER nullable | Candidate policy |
+| `is_active` | BOOLEAN | Current policy marker |
 | `updated_by_user_id` | UUID | Last editor |
 | `created_at` | TIMESTAMPTZ | Creation time |
 | `updated_at` | TIMESTAMPTZ | Last update |
 
-Use one active policy per organization. Retention values cannot be negative.
+Use a partial unique index on `(organization_id)` where `is_active = TRUE`.
+Retention values must be `NULL` or non-negative.
 
 ### 10.5 `provider_events`
 
@@ -793,7 +888,7 @@ job_status:
 
 interview_status:
   created, consented, connecting, active, reconnecting,
-  completing, completed, failed, report_pending, report_ready
+  completing, completed, abandoned, timed_out, failed
 
 interview_language:
   english, urdu, mixed
@@ -801,11 +896,19 @@ interview_language:
 speaker:
   interviewer, candidate, system
 
+turn_type:
+  question, answer, follow_up_question, clarification,
+  instruction, greeting, transition, system_message, timeout, error
+
 recommendation:
   strong_proceed, proceed, review, do_not_proceed
 
 evaluation_status:
   pending, processing, ready, failed
+
+subscription_status:
+  trialing, active, past_due, unpaid, paused, canceled,
+  incomplete, incomplete_expired
 ```
 
 The frontend can convert machine values such as `strong_proceed` into display
@@ -825,12 +928,44 @@ The backend must enforce these rules in the database or service layer:
 6. Duplicate interview events are ignored through idempotency constraints.
 7. Transcript sequence numbers are unique per interview.
 8. Evidence can reference only transcript turns from the same interview.
-9. A recruiter override requires an authorized reviewer and a reason.
-10. Billing provider events are processed once per provider event ID.
-11. Usage ledger records are append-only.
-12. Audit log records are append-only.
-13. Historical interviews use immutable job/rubric snapshots.
-14. Private objects are accessed only through short-lived signed URLs.
+9. Evaluation competency scores are within 0–10 and normalized scores within
+   0–100.
+10. A recruiter decision records a human review and preserves the AI result;
+    an override requires an authorized reviewer and an explanation.
+11. Billing provider events are processed once per provider event ID.
+12. Usage ledger records are append-only.
+13. Audit log records are append-only.
+14. Historical interviews use immutable job/rubric snapshots.
+15. Private objects are accessed only through short-lived signed URLs.
+16. Cross-tenant foreign-key relationships are rejected.
+17. Notification retries are bounded by `max_attempts` and scheduled through
+    `next_attempt_at`.
+
+## 12.1 Dashboard indexes
+
+Create indexes for the first dashboard and recruiter-review queries:
+
+```text
+jobs (organization_id, status, updated_at DESC)
+jobs (organization_id, created_at DESC)
+candidates (organization_id, created_at DESC)
+candidates (organization_id, email)
+interview_links (organization_id, status, expires_at)
+interview_links (job_id, status)
+interview_links (candidate_id, created_at DESC)
+interviews (organization_id, status, created_at DESC)
+interviews (job_id, created_at DESC)
+interviews (candidate_id, created_at DESC)
+interviews (organization_id, completed_at DESC)
+evaluations (organization_id, status, created_at DESC)
+evaluations (organization_id, recommendation, created_at DESC)
+interview_events (interview_id, sequence_no)
+interview_turns (interview_id, sequence_no)
+notifications (status, next_attempt_at)
+```
+
+Validate these indexes with `EXPLAIN ANALYZE` against real API queries.
+Avoid indexing every column because indexes increase write and storage cost.
 
 ---
 
