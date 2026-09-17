@@ -33,6 +33,14 @@ The frontend then calls the interview endpoints defined in the project specifica
 - `POST /api/v1/interviews/{session_id}/events`
 - `POST /api/v1/interviews/{session_id}/complete`
 
+## Owner dashboard
+
+The SaaS owner dashboard is available at `/admin` and is protected by a server-side
+password gate. Set `ADMIN_DASHBOARD_PASSWORD` in `.env.local` or the deployment
+environment to a strong, private value before using it. The dashboard currently
+uses sample platform metrics; connect it to platform analytics and billing APIs
+before treating those values as production data.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More
