@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
+import RecruiterShell from "../../components/RecruiterShell";
 
 type Competency = {
   id: number;
@@ -126,7 +127,7 @@ export default function NewJobPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f8fb]">
+    <RecruiterShell>
       <header className="border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <div>
@@ -334,7 +335,7 @@ export default function NewJobPage() {
           </div>
         </form>
       </div>
-    </main>
+    </RecruiterShell>
   );
 }
 

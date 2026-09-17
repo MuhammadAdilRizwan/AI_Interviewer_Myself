@@ -1,4 +1,5 @@
 import Link from "next/link";
+import RecruiterShell from "../components/RecruiterShell";
 
 const jobs = [
   { id: "junior-python-developer", title: "Junior Python Developer", level: "Junior", candidates: 41, completed: 15, status: "Published", languages: "English + Urdu" },
@@ -8,7 +9,7 @@ const jobs = [
 
 export default function JobsPage() {
   return (
-    <main className="min-h-screen bg-[#f6f8fb]">
+    <RecruiterShell>
       <header className="border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div><p className="text-sm font-bold tracking-tight text-slate-900">Screenwise</p><p className="mt-1 text-xs text-slate-500">Jobs</p></div>
@@ -23,7 +24,7 @@ export default function JobsPage() {
           {jobs.map((job) => <div key={job.id} className="grid gap-4 border-b border-slate-100 px-5 py-5 last:border-0 md:grid-cols-[1.6fr_0.8fr_0.8fr_0.8fr_140px] md:items-center"><div><p className="font-semibold text-slate-800">{job.title}</p><p className="mt-1 text-xs text-slate-500">{job.level} · {job.languages}</p></div><span className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${job.status === "Published" ? "bg-[#eef7f5] text-[#1f6f68]" : "bg-slate-100 text-slate-500"}`}>{job.status}</span><p className="text-sm text-slate-600"><span className="font-semibold text-slate-800">{job.candidates}</span> invited</p><p className="text-sm text-slate-600"><span className="font-semibold text-slate-800">{job.completed}</span> complete</p><Link href={`/jobs/${job.id}/candidates`} className="text-sm font-semibold text-[#1f6f68] hover:underline">Manage candidates →</Link></div>)}
         </div>
       </div>
-    </main>
+    </RecruiterShell>
   );
 }
 

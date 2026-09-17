@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import RecruiterShell from "../../../components/RecruiterShell";
 
 export default function CandidatesPage() {
   const [name, setName] = useState("");
@@ -20,7 +21,7 @@ export default function CandidatesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f8fb]">
+    <RecruiterShell>
       <header className="border-b border-slate-200 bg-white px-5 py-4 sm:px-8"><div className="mx-auto flex max-w-6xl items-center justify-between"><div><p className="text-sm font-bold tracking-tight text-slate-900">Screenwise</p><p className="mt-1 text-xs text-slate-500">Candidate invitations</p></div><Link href="/jobs" className="text-sm font-semibold text-slate-500 hover:text-slate-900">Back to jobs</Link></div></header>
       <div className="mx-auto max-w-6xl px-5 py-8 sm:px-8">
         <p className="text-sm font-medium text-[#1f6f68]">Junior Python Developer</p><h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900">Invite a candidate</h1><p className="mt-2 text-sm text-slate-500">Create a secure interview link. Candidates do not need to create an account.</p>
@@ -29,6 +30,6 @@ export default function CandidatesPage() {
           <aside className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><p className="text-xs font-bold uppercase tracking-wider text-slate-400">What candidates will see</p><h2 className="mt-3 text-lg font-semibold text-slate-900">A calm, guided first round</h2><ul className="mt-5 space-y-4 text-sm leading-5 text-slate-600"><li>✓ Job and organization introduction</li><li>✓ Privacy and recording consent</li><li>✓ English and Urdu language selection</li><li>✓ Microphone and connection check</li><li>✓ 10-minute adaptive voice interview</li></ul></aside>
         </div>
       </div>
-    </main>
+    </RecruiterShell>
   );
 }
