@@ -2,8 +2,8 @@
 
 ## Database Design Specification
 
-**Version:** 1.0  
-**Status:** Discussion draft  
+**Version:** 2.0
+**Status:** Finalized production target
 **Database:** PostgreSQL 16+  
 **Audience:** Backend engineering, frontend engineering, product, security
 
@@ -32,6 +32,8 @@ The database must support:
 - Audit logging
 - Retention policies
 - Provider webhook idempotency
+- SaaS owner/platform administration
+- Platform-wide billing, support, and operational analytics
 
 This is a design draft for review. The backend team should confirm naming,
 enum strategy, retention requirements, and provider-specific details before
@@ -41,7 +43,7 @@ writing production migrations.
 
 ## 2. Recommended table count
 
-### Production-capable MVP: 28 tables
+### Production-capable target: 35 tables
 
 1. `organizations`
 2. `users`
@@ -71,6 +73,13 @@ writing production migrations.
 26. `audit_logs`
 27. `retention_policies`
 28. `provider_events`
+29. `platform_admins`
+30. `billing_invoices`
+31. `payment_transactions`
+32. `support_tickets`
+33. `system_incidents`
+34. `platform_metric_snapshots`
+35. `feature_flags`
 
 ### Minimum first vertical slice: 16 tables
 
@@ -96,7 +105,8 @@ recruiter_decisions
 ```
 
 The remaining tables should be added before production billing, resume
-processing, retention automation, and operational hardening.
+processing, retention automation, and operational hardening. Platform tables
+are global and must never be exposed through tenant-scoped customer queries.
 
 ---
 
@@ -275,6 +285,38 @@ storage assets.
 Use the same columns as `email_verification_tokens`, replacing the purpose
 with password-reset semantics.
 
+### 4.7 `platform_admins`
+
+**Purpose:** Grants platform-level access to the SaaS owner and authorized
+internal staff. This is separate from `organization_members`, because a
+platform administrator can manage the entire service without belonging to a
+customer organization.
+
+| Column | Type | Reason |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `user_id` | UUID | Platform administrator identity |
+| `role` | ENUM/VARCHAR | `owner`, `admin`, `support`, `billing`, `analyst` |
+| `status` | ENUM/VARCHAR | `active`, `suspended`, `revoked` |
+| `mfa_required` | BOOLEAN | Require MFA for platform access |
+| `granted_by_user_id` | UUID nullable | Authorizing administrator |
+| `last_admin_login_at` | TIMESTAMPTZ nullable | Security tracking |
+| `created_at` | TIMESTAMPTZ | Grant time |
+| `updated_at` | TIMESTAMPTZ | Last change |
+| `revoked_at` | TIMESTAMPTZ nullable | Revocation time |
+
+**Constraints/indexes:**
+
+- Unique `(user_id)`; one user has at most one platform grant.
+- Only one active `owner` grant is permitted unless an explicit owner-transfer
+  workflow is used.
+- Index `(role, status)`.
+- All changes require an `audit_logs` record.
+
+The current development password gate is only a bootstrap mechanism. Before
+production, `/admin` must authenticate a `users` row and authorize it through
+this table.
+
 ---
 
 ## 5. Billing tables
@@ -323,6 +365,66 @@ with password-reset semantics.
 
 - Unique provider customer and subscription IDs where present.
 - `CHECK (current_period_end > current_period_start)`.
+
+### 5.3 `billing_invoices`
+
+**Purpose:** Immutable invoice snapshots used for revenue, collection, and
+customer billing reporting. The payment provider remains the source of truth;
+this table stores the application copy needed for reliable reporting.
+
+| Column | Type | Reason |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `organization_id` | UUID | Customer tenant |
+| `subscription_id` | UUID nullable | Related subscription |
+| `provider_invoice_id` | VARCHAR(255) | Provider invoice ID |
+| `invoice_number` | VARCHAR(100) nullable | Human-readable invoice number |
+| `status` | ENUM/VARCHAR | `draft`, `open`, `paid`, `void`, `uncollectible` |
+| `currency` | CHAR(3) | Invoice currency |
+| `subtotal_amount` | NUMERIC(12,2) | Before tax/discount |
+| `tax_amount` | NUMERIC(12,2) | Tax |
+| `total_amount` | NUMERIC(12,2) | Final amount |
+| `amount_paid` | NUMERIC(12,2) | Amount collected |
+| `period_start` | TIMESTAMPTZ | Service period |
+| `period_end` | TIMESTAMPTZ | Service period |
+| `due_at` | TIMESTAMPTZ nullable | Payment due time |
+| `paid_at` | TIMESTAMPTZ nullable | Collection time |
+| `created_at` | TIMESTAMPTZ | Provider creation time |
+| `updated_at` | TIMESTAMPTZ | Last synchronization |
+
+**Constraints/indexes:**
+
+- Unique `(provider_invoice_id)`.
+- Index `(status, created_at DESC)`.
+- Index `(organization_id, created_at DESC)`.
+- Monetary values are non-negative and use a fixed currency precision.
+
+### 5.4 `payment_transactions`
+
+**Purpose:** Immutable payment, refund, and chargeback records for revenue
+and payment-failure reporting.
+
+| Column | Type | Reason |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `organization_id` | UUID | Customer tenant |
+| `invoice_id` | UUID nullable | Related invoice |
+| `provider_transaction_id` | VARCHAR(255) | Provider charge/payment ID |
+| `type` | ENUM/VARCHAR | `payment`, `refund`, `chargeback`, `credit` |
+| `status` | ENUM/VARCHAR | `pending`, `succeeded`, `failed`, `reversed` |
+| `amount` | NUMERIC(12,2) | Transaction amount |
+| `currency` | CHAR(3) | Transaction currency |
+| `failure_code` | VARCHAR(100) nullable | Provider failure code |
+| `failure_message` | TEXT nullable | Safe provider error |
+| `processed_at` | TIMESTAMPTZ nullable | Processing time |
+| `created_at` | TIMESTAMPTZ | Creation time |
+
+**Constraints/indexes:**
+
+- Unique `(provider_transaction_id)`.
+- Index `(status, created_at DESC)`.
+- Index `(organization_id, created_at DESC)`.
+- Do not store card numbers, CVVs, or other payment credentials.
 
 ---
 
@@ -868,6 +970,94 @@ Retention values must be `NULL` or non-negative.
 
 **Constraints:** Unique `(provider, provider_event_id)`.
 
+### 10.6 `support_tickets`
+
+**Purpose:** Customer support cases visible to platform staff without mixing
+support data into tenant recruiting tables.
+
+| Column | Type | Reason |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `organization_id` | UUID nullable | Related customer |
+| `requester_user_id` | UUID nullable | Customer requester |
+| `assigned_admin_id` | UUID nullable | Platform staff owner |
+| `subject` | VARCHAR(200) | Ticket subject |
+| `description` | TEXT | Customer issue |
+| `status` | ENUM/VARCHAR | `open`, `pending`, `resolved`, `closed` |
+| `priority` | ENUM/VARCHAR | `low`, `normal`, `high`, `urgent` |
+| `category` | VARCHAR(60) | Billing, access, interview, technical |
+| `metadata_json` | JSONB | Safe diagnostic context |
+| `resolved_at` | TIMESTAMPTZ nullable | Resolution time |
+| `created_at` | TIMESTAMPTZ | Creation time |
+| `updated_at` | TIMESTAMPTZ | Last update |
+
+Indexes: `(status, priority, created_at DESC)` and
+`(organization_id, created_at DESC)`.
+
+### 10.7 `system_incidents`
+
+**Purpose:** Platform availability and provider incident tracking for the
+owner dashboard and status communication.
+
+| Column | Type | Reason |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `service` | VARCHAR(80) | API, database, AI, email, storage |
+| `severity` | ENUM/VARCHAR | `notice`, `minor`, `major`, `critical` |
+| `status` | ENUM/VARCHAR | `investigating`, `identified`, `monitoring`, `resolved` |
+| `title` | VARCHAR(200) | Incident title |
+| `summary` | TEXT | Safe incident summary |
+| `started_at` | TIMESTAMPTZ | Start time |
+| `resolved_at` | TIMESTAMPTZ nullable | Resolution time |
+| `created_by_admin_id` | UUID nullable | Creating administrator |
+| `created_at` | TIMESTAMPTZ | Creation time |
+| `updated_at` | TIMESTAMPTZ | Last update |
+
+Index `(status, severity, started_at DESC)`. Incident changes must be audited.
+
+### 10.8 `platform_metric_snapshots`
+
+**Purpose:** Daily or hourly pre-aggregated platform metrics for fast owner
+dashboard queries. These are derived data, not the source of truth.
+
+| Column | Type | Reason |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `metric_key` | VARCHAR(100) | MRR, organizations, interviews, failures |
+| `period_start` | TIMESTAMPTZ | Bucket start |
+| `period_end` | TIMESTAMPTZ | Bucket end |
+| `value_numeric` | NUMERIC(18,6) nullable | Numeric metric |
+| `value_text` | VARCHAR(255) nullable | Non-numeric metric |
+| `currency` | CHAR(3) nullable | Currency for financial metrics |
+| `dimensions_json` | JSONB | Plan, region, provider, or status |
+| `computed_at` | TIMESTAMPTZ | Calculation time |
+
+**Constraints/indexes:**
+
+- Unique `(metric_key, period_start, dimensions_json)`.
+- Index `(metric_key, period_start DESC)`.
+- Rebuildable from source tables and usage ledger.
+
+### 10.9 `feature_flags`
+
+**Purpose:** Controlled rollout of product and platform capabilities.
+
+| Column | Type | Reason |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `key` | VARCHAR(120) | Stable flag key |
+| `description` | TEXT | Flag purpose |
+| `enabled_globally` | BOOLEAN | Global default |
+| `organization_id` | UUID nullable | Optional tenant override |
+| `enabled` | BOOLEAN | Override value |
+| `config_json` | JSONB | Optional flag configuration |
+| `created_by_admin_id` | UUID nullable | Author |
+| `created_at` | TIMESTAMPTZ | Creation time |
+| `updated_at` | TIMESTAMPTZ | Last update |
+
+Unique `(key, organization_id)`; a `NULL` organization means the global flag.
+Every change must be written to `audit_logs`.
+
 ---
 
 ## 11. Standard enums
@@ -909,6 +1099,33 @@ evaluation_status:
 subscription_status:
   trialing, active, past_due, unpaid, paused, canceled,
   incomplete, incomplete_expired
+
+platform_admin_role:
+  owner, admin, support, billing, analyst
+
+platform_admin_status:
+  active, suspended, revoked
+
+invoice_status:
+  draft, open, paid, void, uncollectible
+
+payment_transaction_type:
+  payment, refund, chargeback, credit
+
+payment_transaction_status:
+  pending, succeeded, failed, reversed
+
+support_ticket_status:
+  open, pending, resolved, closed
+
+support_ticket_priority:
+  low, normal, high, urgent
+
+incident_severity:
+  notice, minor, major, critical
+
+incident_status:
+  investigating, identified, monitoring, resolved
 ```
 
 The frontend can convert machine values such as `strong_proceed` into display
@@ -940,6 +1157,16 @@ The backend must enforce these rules in the database or service layer:
 16. Cross-tenant foreign-key relationships are rejected.
 17. Notification retries are bounded by `max_attempts` and scheduled through
     `next_attempt_at`.
+18. Platform-admin grants are active only for active users and are checked on
+    every admin request.
+19. Invoice and payment provider IDs are unique and provider webhook handling
+    is idempotent.
+20. Billing, support, incident, feature-flag, and platform-admin changes are
+    recorded in append-only audit logs.
+21. Platform metric snapshots are derived and can be recomputed from source
+    tables; they must never be used as the billing source of truth.
+22. Financial amounts include a currency and are never silently converted
+    across currencies.
 
 ## 12.1 Dashboard indexes
 
@@ -962,6 +1189,13 @@ evaluations (organization_id, recommendation, created_at DESC)
 interview_events (interview_id, sequence_no)
 interview_turns (interview_id, sequence_no)
 notifications (status, next_attempt_at)
+platform_admins (role, status)
+billing_invoices (status, created_at DESC)
+payment_transactions (status, created_at DESC)
+support_tickets (status, priority, created_at DESC)
+system_incidents (status, severity, started_at DESC)
+platform_metric_snapshots (metric_key, period_start DESC)
+feature_flags (key, organization_id)
 ```
 
 Validate these indexes with `EXPLAIN ANALYZE` against real API queries.
@@ -982,7 +1216,9 @@ Avoid indexing every column because indexes increase write and storage cost.
 | Evaluation report | `evaluations`, `evaluation_competencies`, `evaluation_evidence` |
 | Human review | `recruiter_decisions`, `audit_logs` |
 | Billing/dashboard usage | `plans`, `subscriptions`, `usage_ledger` |
-| Privacy/operations | `retention_policies`, `audit_logs`, `provider_events` |
+| Owner/admin dashboard | `platform_admins`, `billing_invoices`, `payment_transactions`, `usage_ledger`, `platform_metric_snapshots` |
+| Customer support and reliability | `support_tickets`, `system_incidents`, `provider_events` |
+| Privacy/operations | `retention_policies`, `audit_logs`, `provider_events`, `feature_flags` |
 
 ---
 
@@ -1049,6 +1285,18 @@ notifications
 audit_logs
 retention_policies
 provider_events
+platform_admins
+billing_invoices
+payment_transactions
+support_tickets
+system_incidents
+feature_flags
+```
+
+### Migration 8: Platform analytics
+
+```text
+platform_metric_snapshots
 ```
 
 ---
@@ -1106,14 +1354,34 @@ expires_at
 created_at
 ```
 
-### `feature_flags`
-
-For controlled rollout of Urdu support, recording, resume processing,
-WebRTC, and alternative providers.
-
 ---
 
-## 16. Backend review questions
+## 16. Finalized implementation decisions
+
+The following decisions apply to the production schema:
+
+1. PostgreSQL UUID primary keys and `TIMESTAMPTZ` are used throughout.
+2. PostgreSQL enums or validated application constants must use the values in
+   section 11; the backend may choose either implementation consistently.
+3. Platform administrators are users with a separate `platform_admins` grant;
+   customer organization roles never grant platform-wide access.
+4. `auth_sessions` is the session table for both customer and platform users.
+   Each request must authorize the session against the current user status and
+   platform grant where applicable.
+5. Stripe or another payment provider is the financial source of truth.
+   `billing_invoices`, `payment_transactions`, and `provider_events` are
+   synchronized immutable application records.
+6. `usage_ledger` is append-only and is the source for usage metering and AI
+   cost calculations.
+7. `platform_metric_snapshots` are rebuildable performance caches only.
+8. All platform-admin actions and sensitive reads are written to `audit_logs`.
+9. Customer data remains tenant-scoped; platform administrators may access it
+   only through explicitly authorized support or operational workflows.
+10. The development `ADMIN_DASHBOARD_PASSWORD` is not the production
+    authentication model and must be removed once database-backed auth is
+    enabled.
+
+## 17. Backend review questions
 
 Before finalizing migrations, confirm:
 
@@ -1137,10 +1405,12 @@ Before finalizing migrations, confirm:
 
 ---
 
-## 17. Final recommendation
+## 18. Final recommendation
 
-Use the 28-table production-capable design as the target schema, but implement
-the first 16-table migration set to validate the core workflow:
+Use the 35-table production target as the finalized schema. Implement the
+first 16-table migration set to validate the core workflow, then apply the
+billing/operations migrations before production launch and the platform
+analytics migration before exposing historical owner reporting:
 
 ```text
 Recruiter creates job
@@ -1155,4 +1425,6 @@ Recruiter creates job
 
 The most important architectural decision is immutable interview snapshots.
 Without them, changing a job or rubric can silently change the meaning of
-historical evaluations.
+historical evaluations. The same principle applies to billing and usage:
+provider events and append-only usage records must remain immutable, while
+dashboard snapshots may be rebuilt.
