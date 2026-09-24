@@ -16,6 +16,16 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Public landing page and workspace
+
+The public landing page is available at `/`. Visitors can review Screenwise
+services and pricing, then choose a plan at `/purchase`. The current frontend
+checkout is a prototype: after the form is submitted, it redirects to
+`/overview?subscription=success`. Connect the purchase handler to Stripe or the
+backend billing API before using it in production.
+
+The recruiter workspace overview is available at `/overview`.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 ## API configuration

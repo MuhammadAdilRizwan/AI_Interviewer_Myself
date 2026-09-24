@@ -134,7 +134,7 @@ export default function NewJobPage() {
             <p className="text-sm font-bold tracking-tight text-slate-900">Screenwise</p>
             <p className="mt-1 text-xs text-slate-500">Create a new interview</p>
           </div>
-          <Link href="/" className="text-sm font-semibold text-slate-500 hover:text-slate-900">
+          <Link href="/overview" className="text-sm font-semibold text-slate-500 hover:text-slate-900">
             Back to dashboard
           </Link>
         </div>

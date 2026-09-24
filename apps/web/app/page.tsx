@@ -1,170 +1,71 @@
 import Link from "next/link";
-import LiveDate from "./components/LiveDate";
-import RecruiterShell from "./components/RecruiterShell";
+
+const features = [
+  ["Evidence-based screening", "Every answer becomes structured evidence your team can review."],
+  ["English, Urdu, or mixed", "Meet candidates in the language where they communicate best."],
+  ["Built for fairer hiring", "Consistent rubrics and comparable reports for every candidate."],
+];
+
+const plans = [
+  { name: "Starter", price: "$49", description: "For small teams getting started", features: ["100 interviews/month", "English and Urdu interviews", "Evidence-based reports"] },
+  { name: "Growth", price: "$129", description: "For teams hiring every week", features: ["500 interviews/month", "Adaptive follow-up questions", "Advanced recruiter analytics"], featured: true },
+  { name: "Scale", price: "$299", description: "For high-volume recruiting teams", features: ["Unlimited team members", "2,000 interviews/month", "Priority support and exports"] },
+];
 
 export default function Home() {
   return (
-    <RecruiterShell>
-          <header className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
-            <div>
-              <LiveDate />
-              <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
-                Good morning, Ayesha
-              </h1>
-            </div>
-            <div className="flex items-center gap-3">
-              <button className="hidden rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 sm:block">
-                View as candidate
-              </button>
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#dcefeb] text-sm font-bold text-[#1f6f68]">
-                AR
-              </div>
-            </div>
-          </header>
-
-          <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8">
-            <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-              <div>
-                <p className="text-sm font-medium text-[#1f6f68]">Workspace overview</p>
-                <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
-                  Your hiring pipeline
-                </h2>
-                <p className="mt-2 text-sm text-slate-500">
-                  Review interview progress and discover your strongest candidates.
-                </p>
-              </div>
-              <Link
-                href="/jobs/new"
-                className="rounded-lg bg-[#1f6f68] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#185b55]"
-              >
-                Create a job
-              </Link>
-            </section>
-
-            <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Workspace metrics">
-              <MetricCard label="Active jobs" value="06" change="+2 this month" />
-              <MetricCard label="Candidates screened" value="128" change="+18% from last month" />
-              <MetricCard label="Completion rate" value="84.6%" change="+6.2% from last month" />
-              <MetricCard label="Minutes remaining" value="613" change="of 1,000 plan minutes" />
-            </section>
-
-            <section className="mt-8 grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-              <div className="rounded-2xl border border-slate-200 bg-white">
-                <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-                  <div>
-                    <h3 className="font-semibold text-slate-900">Active jobs</h3>
-                    <p className="mt-1 text-xs text-slate-500">Track candidates across your open roles.</p>
-                  </div>
-                  <Link href="/jobs" className="text-sm font-semibold text-[#1f6f68] hover:underline">View all</Link>
-                </div>
-                <div className="divide-y divide-slate-100">
-                  <JobRow title="Senior Backend Engineer" candidates="32 candidates" progress="78%" tone="teal" />
-                  <JobRow title="Product Designer" candidates="18 candidates" progress="54%" tone="blue" />
-                  <JobRow title="Junior Python Developer" candidates="41 candidates" progress="36%" tone="amber" />
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white">
-                <div className="border-b border-slate-100 px-5 py-4">
-                  <h3 className="font-semibold text-slate-900">Recent interviews</h3>
-                  <p className="mt-1 text-xs text-slate-500">Reports ready for your review.</p>
-                </div>
-                <div className="divide-y divide-slate-100">
-                  <InterviewRow initials="HM" name="Hassan Malik" role="Backend Engineer" score="86" />
-                  <InterviewRow initials="SA" name="Sara Ahmed" role="Product Designer" score="79" />
-                  <InterviewRow initials="OK" name="Omar Khan" role="Python Developer" score="74" />
-                </div>
-                <div className="px-5 py-4">
-                  <button className="w-full rounded-lg border border-slate-200 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">
-                    Open reports
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            <section className="mt-6 rounded-2xl border border-[#cde4df] bg-[#eef7f5] p-5 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-[#1f6f68]">Ready to create your next interview?</p>
-                <p className="mt-1 text-sm text-slate-600">
-                  Define a job rubric first, then let Screenwise handle the first round.
-                </p>
-              </div>
-              <Link href="/jobs/new" className="mt-4 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#1f6f68] shadow-sm ring-1 ring-inset ring-[#cde4df] hover:bg-[#f9fffd] sm:mt-0">
-                Start with a job
-              </Link>
-            </section>
-          </div>
-    </RecruiterShell>
-  );
-}
-
-function MetricCard({ label, value, change }: { label: string; value: string; change: string }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5">
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{value}</p>
-      <p className="mt-2 text-xs font-medium text-[#1f6f68]">{change}</p>
-    </div>
-  );
-}
-
-function JobRow({
-  title,
-  candidates,
-  progress,
-  tone,
-}: {
-  title: string;
-  candidates: string;
-  progress: string;
-  tone: "teal" | "blue" | "amber";
-}) {
-  const colors = {
-    teal: "bg-[#1f6f68]",
-    blue: "bg-blue-500",
-    amber: "bg-amber-500",
-  };
-
-  return (
-    <div className="px-5 py-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold text-slate-800">{title}</p>
-          <p className="mt-1 text-xs text-slate-500">{candidates}</p>
+    <main className="min-h-screen overflow-hidden bg-white text-slate-900">
+      <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
+        <Link href="/" className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#1f6f68] text-lg font-bold text-white">S</span>
+          <span><span className="block text-sm font-bold tracking-tight">Screenwise</span><span className="block text-xs text-slate-500">AI interviewer</span></span>
+        </Link>
+        <div className="hidden items-center gap-7 text-sm font-medium text-slate-600 md:flex">
+          <a href="#how-it-works" className="hover:text-[#1f6f68]">How it works</a>
+          <a href="#features" className="hover:text-[#1f6f68]">Features</a>
+          <a href="#pricing" className="hover:text-[#1f6f68]">Pricing</a>
         </div>
-        <span className="text-sm font-semibold text-slate-700">{progress}</span>
-      </div>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
-        <div className={`h-full rounded-full ${colors[tone]}`} style={{ width: progress }} />
-      </div>
-    </div>
-  );
-}
+        <div className="flex items-center gap-3">
+          <Link href="/overview" className="hidden text-sm font-semibold text-slate-600 hover:text-[#1f6f68] sm:block">Sign in</Link>
+          <Link href="/purchase" className="rounded-lg bg-[#1f6f68] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#185b55]">Get started</Link>
+        </div>
+      </nav>
 
-function InterviewRow({
-  initials,
-  name,
-  role,
-  score,
-}: {
-  initials: string;
-  name: string;
-  role: string;
-  score: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 px-5 py-4">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
-        {initials}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-slate-800">{name}</p>
-        <p className="mt-1 truncate text-xs text-slate-500">{role}</p>
-      </div>
-      <div className="text-right">
-        <p className="text-sm font-bold text-[#1f6f68]">{score}/100</p>
-        <p className="mt-1 text-[11px] text-slate-400">Report ready</p>
-      </div>
-    </div>
+      <section className="relative mx-auto max-w-7xl px-5 pb-20 pt-14 sm:px-8 sm:pt-20 lg:pb-28 lg:pt-24">
+        <div className="absolute -right-32 -top-24 -z-0 h-96 w-96 rounded-full bg-[#eef7f5] blur-3xl" />
+        <div className="relative z-10 max-w-3xl">
+          <p className="inline-flex rounded-full border border-[#cde4df] bg-[#eef7f5] px-3 py-1 text-xs font-bold uppercase tracking-widest text-[#1f6f68]">First-round hiring, reimagined</p>
+          <h1 className="mt-6 text-5xl font-semibold leading-[1.08] tracking-tight text-slate-950 sm:text-7xl">Find the right people, <span className="text-[#1f6f68]">faster.</span></h1>
+          <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600 sm:text-xl">Screenwise conducts thoughtful AI interviews in English, Urdu, and mixed language, then gives your team clear evidence to make better hiring decisions.</p>
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+            <Link href="/purchase" className="rounded-lg bg-[#1f6f68] px-6 py-3.5 text-center text-sm font-semibold text-white shadow-lg shadow-[#1f6f68]/20 hover:bg-[#185b55]">Start screening candidates</Link>
+            <a href="#how-it-works" className="rounded-lg border border-slate-200 px-6 py-3.5 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50">See how it works</a>
+          </div>
+          <p className="mt-5 text-xs text-slate-500">No long implementation. Start with your first job in minutes.</p>
+        </div>
+        <div className="relative z-10 mt-14 grid max-w-4xl gap-4 sm:grid-cols-3">
+          {["84.6% completion rate", "3 languages supported", "Evidence in every report"].map((item) => <div key={item} className="rounded-xl border border-slate-200 bg-white/80 p-4 text-sm font-semibold text-slate-700 shadow-sm">{item}</div>)}
+        </div>
+      </section>
+
+      <section id="how-it-works" className="border-y border-slate-100 bg-[#f8fbfa] px-5 py-20 sm:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="max-w-xl"><p className="text-sm font-bold uppercase tracking-widest text-[#1f6f68]">A simpler workflow</p><h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">From job description to confident decision.</h2></div>
+          <div className="mt-12 grid gap-6 md:grid-cols-3">
+            {[["01", "Define your rubric", "Set the competencies, language, duration, and evidence standards for the role."], ["02", "Invite candidates", "Share a secure interview link. Candidates complete the first round on their own schedule."], ["03", "Review the evidence", "See transcripts, competency scores, and supporting answers in one focused report."]].map(([number, title, text]) => <div key={number} className="rounded-2xl border border-slate-200 bg-white p-6"><p className="text-sm font-bold text-[#1f6f68]">{number}</p><h3 className="mt-5 text-lg font-semibold">{title}</h3><p className="mt-3 text-sm leading-6 text-slate-500">{text}</p></div>)}
+          </div>
+        </div>
+      </section>
+
+      <section id="features" className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28">
+        <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start"><div><p className="text-sm font-bold uppercase tracking-widest text-[#1f6f68]">Why Screenwise</p><h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">More signal. Less screening fatigue.</h2></div><div className="grid gap-4">{features.map(([title, text]) => <div key={title} className="rounded-2xl border border-slate-200 p-6"><h3 className="font-semibold">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{text}</p></div>)}</div></div>
+      </section>
+
+      <section id="pricing" className="bg-[#102e2c] px-5 py-20 text-white sm:px-8 lg:py-24">
+        <div className="mx-auto max-w-7xl"><div className="max-w-xl"><p className="text-sm font-bold uppercase tracking-widest text-[#92d3c9]">Simple pricing</p><h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Choose a plan that fits your hiring rhythm.</h2></div><div className="mt-12 grid gap-5 lg:grid-cols-3">{plans.map((plan) => <div key={plan.name} className={`rounded-2xl p-6 ${plan.featured ? "bg-[#1f6f68] ring-2 ring-[#92d3c9]" : "bg-white/10"}`}><p className="font-semibold">{plan.name}</p><p className="mt-2 text-sm text-white/70">{plan.description}</p><p className="mt-7 text-4xl font-semibold">{plan.price}<span className="text-sm font-normal text-white/60"> / month</span></p><ul className="mt-7 space-y-3 text-sm text-white/80">{plan.features.map((feature) => <li key={feature}>✓ {feature}</li>)}</ul><Link href={`/purchase?plan=${plan.name.toLowerCase()}`} className="mt-8 block rounded-lg bg-white px-4 py-3 text-center text-sm font-semibold text-[#1f6f68] hover:bg-[#f1fffc]">{plan.featured ? "Choose Growth" : `Choose ${plan.name}`}</Link></div>)}</div></div>
+      </section>
+
+      <footer className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-8 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-8"><p>© 2026 Screenwise. Evidence-based hiring for modern teams.</p><Link href="/purchase" className="font-semibold text-[#1f6f68] hover:underline">Get started</Link></footer>
+    </main>
   );
 }

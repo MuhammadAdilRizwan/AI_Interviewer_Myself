@@ -13,7 +13,7 @@ export default function JobsPage() {
       <header className="border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div><p className="text-sm font-bold tracking-tight text-slate-900">Screenwise</p><p className="mt-1 text-xs text-slate-500">Jobs</p></div>
-          <div className="flex items-center gap-4"><Link href="/" className="text-sm font-semibold text-slate-500 hover:text-slate-900">Dashboard</Link><Link href="/jobs/new" className="rounded-lg bg-[#1f6f68] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#185b55]">Create a job</Link></div>
+          <div className="flex items-center gap-4"><Link href="/overview" className="text-sm font-semibold text-slate-500 hover:text-slate-900">Dashboard</Link><Link href="/jobs/new" className="rounded-lg bg-[#1f6f68] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#185b55]">Create a job</Link></div>
         </div>
       </header>
       <div className="mx-auto max-w-6xl px-5 py-8 sm:px-8">

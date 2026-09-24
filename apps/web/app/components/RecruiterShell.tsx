@@ -8,7 +8,7 @@ export default function RecruiterShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const jobsActive = pathname === "/jobs" || pathname === "/jobs/new";
   const candidatesActive = pathname.includes("/candidates");
-  const overviewActive = pathname === "/";
+  const overviewActive = pathname === "/overview";
 
   return (
     <div className="min-h-screen bg-[#f6f8fb]">
@@ -23,7 +23,7 @@ export default function RecruiterShell({ children }: { children: ReactNode }) {
           </div>
 
           <nav className="mt-10 space-y-1" aria-label="Main navigation">
-            <NavItem label="Overview" href="/" active={overviewActive} />
+            <NavItem label="Overview" href="/overview" active={overviewActive} />
             <NavItem label="Jobs" href="/jobs" active={jobsActive} />
             <NavItem label="Candidates" href="/jobs" active={candidatesActive} />
             <NavItem label="Reports" />
@@ -42,7 +42,7 @@ export default function RecruiterShell({ children }: { children: ReactNode }) {
             <div className="rounded-2xl bg-[#eef7f5] p-4">
               <p className="text-xs font-semibold text-[#1f6f68]">Starter plan</p>
               <p className="mt-2 text-xs leading-5 text-slate-600">42 of 100 interviews used this month.</p>
-              <button className="mt-3 text-xs font-semibold text-[#1f6f68] hover:underline">Manage plan</button>
+              <Link href="/purchase" className="mt-3 inline-block text-xs font-semibold text-[#1f6f68] hover:underline">Manage plan</Link>
             </div>
           </div>
         </aside>

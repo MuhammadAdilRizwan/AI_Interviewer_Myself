@@ -39,7 +39,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           </nav>
           <div className="mt-10 border-t border-slate-800 pt-6">
             <p className="px-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Workspace</p>
-            <Link href="/" className="mt-3 flex rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-slate-900 hover:text-white">Open customer workspace</Link>
+            <Link href="/overview" className="mt-3 flex rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-slate-900 hover:text-white">Open customer workspace</Link>
           </div>
         </aside>
 
